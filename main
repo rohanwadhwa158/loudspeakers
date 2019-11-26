@@ -1,0 +1,116 @@
+%initialize parameters
+
+D = 0.15;
+V = 0.027; 
+mspool = 2.4e-3; 
+BL = 2.25; 
+k1 = 2600; 
+D2 = 0.05; 
+L = 0.10; 
+rho = 1.2;
+c = 340;
+%read name and path of input data file 
+[name, path] = uigetfile ('*.bin','Specify a binary input data-file');   
+fid = fopen([path,name],'rb');
+icap = fread(fid, 'float32');
+fclose(fid); 
+
+
+%calculate parameters
+
+
+r = D/2;                     %radius of loudspeaker membrane 
+S1 = pi*(r^2);               %surfacearea of loudspeaker membrane
+r2 = D2/2;                   %radius of bass tube 
+S2 = pi*(r2^2);                 %cross-sectional area of bass tube 
+
+f = icap(1:2:end);                       %frequency range
+
+I = icap(3:4:end);                       %current amplitude  
+
+%calculation of displacement amplitude
+
+ma1 = rho*((pi*S1*D)/4);  
+
+ka11 = rho*(c*S1)^2/V; 
+
+f0 = (1/(2*pi)) * sqrt((k1+ka11)/(ma1+mspool));
+    
+Fcap = BL*I; 
+
+X1cap = (Fcap/(ma1+mspool)).*(1./(((2*pi*f0)^2) - ((2*pi*f).^2)));            %displacement amplitude of box loudspeaker
+
+%sound power of box loudspeaker
+
+W = ((2*rho*(pi^3))/c)*(S1^2)*(f.^4).*(X1cap.^2); 
+
+
+% calculation of parameters of displacement amplitudes of bass reflex loudspeaker
+
+ka12 = (rho*(c^2)*S1*S2)/V; 
+
+ka21 = (rho*(c^2)*S1*S2)/V; 
+
+ka22 = (rho*((c*S2)^2))/V; 
+
+ma2 = rho*((L*S2)+((pi*S2*D2)/4));
+
+M = [ma1+mspool 0; 0 ma2]; 
+
+K = [ka11+k1 -ka12; -ka21 ka22]; 
+
+om = 2*pi*f; 
+
+om2 = om.*om; 
+
+%for m=1:length(Fcap)
+    %fcc(:,m)= [Fcap(m); 0];
+%end
+% calculation of displacement amplitude 
+
+for n=1:length(f)
+  
+    A = -om2(n)*M+K;
+    
+    fcap = [Fcap(n); 0];
+    
+    x = A\fcap;
+    
+    xtopp1 (n) = x(1); 
+    xtopp2 (n) = x(2);
+    
+    %power of bass reflex box
+    
+    if xtopp1(n)>0 && xtopp2(n)>0
+        Wbr = ((2*rho*(pi^3))/c)*(f.^4).*((abs(S1*xtopp1(n))-abs(S2*xtopp2(n))).^2);
+    elseif xtopp1(n)<0 && xtopp2(n)<0
+        Wbr = ((2*rho*(pi^3))/c)*(f.^4).*((abs(S1*xtopp1(n))-abs(S2*xtopp2(n))).^2);
+    elseif xtopp1(n)>0 && xtopp2(n)<0
+        Wbr = ((2*rho*(pi^3))/c)*(f.^4).*((abs(S1*xtopp1(n))+abs(S2*xtopp2(n))).^2); 
+    elseif xtopp1(n)<0 && xtopp2(n)>0 
+        Wbr = ((2*rho*(pi^3))/c)*(f.^4).*((abs(S1*xtopp1(n))+abs(S2*xtopp2(n))).^2);
+    end  
+    
+    W2 (n) = Wbr (n);    
+    end
+    
+  
+
+
+    
+ 
+yyaxis left                      %frequency vs bass reflex box power
+%plot(f,W2)
+semilogy(f,W2,'.')
+title('radiated sound power as a function of frequency')
+xlabel('frequency')
+ylabel('Wbr') 
+
+yyaxis right                     %frequency vs conventional loudspeaker power
+%plot(f,W)
+semilogy(f,W,'.')
+ylabel('W')
+%ylabel('W(in log scale)')  
+    
+
+%end of task    
